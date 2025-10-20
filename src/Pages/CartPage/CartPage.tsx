@@ -9,22 +9,19 @@ export function CartPage() {
   const [total, setTotal] = useState<number>(0);
   const [message, setMessage] = useState<string>("");
 
-  // 🔹 Carrega o carrinho ao montar
   useEffect(() => {
     const storedCart = getCart();
     setCart(storedCart);
   }, []);
 
-  // 🔹 Recalcula o total sempre que o carrinho mudar
   useEffect(() => {
     const sum = cart.reduce((acc, item) => acc + item.price, 0);
     setTotal(Number(sum.toFixed(2)));
-  }, [cart]); // << importante! escuta mudanças no carrinho
+  }, [cart]); 
 
-  // 🔹 Remove item e atualiza tudo em tempo real
   function handleRemove(id: number) {
     const updated = removeFromCart(id);
-    setCart(updated); // 🔥 atualiza o estado, dispara o useEffect acima
+    setCart(updated);
   }
 
   function handleCheckout() {
@@ -80,8 +77,6 @@ export function CartPage() {
     </>
   );
 }
-
-// === Estilos com responsividade ===
 
 const Container = styled.div`
   padding: 40px;

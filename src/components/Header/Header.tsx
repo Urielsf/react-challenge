@@ -12,15 +12,13 @@ export function Header({ cartCount }: HeaderProps) {
 
   return (
     <HeaderContainer>
-      {/* === LOGO === */}
-      <Logo to="/">🛍️ MyShop</Logo>
 
-      {/* === BOTÃO MOBILE === */}
+      <Logo to="/">🛍️ My Shop</Logo>
+  
       <MenuButton onClick={() => setOpen(!open)}>
         {open ? <X size={26} /> : <Menu size={26} />}
       </MenuButton>
 
-      {/* === NAVEGAÇÃO === */}
       <Nav $open={open}>
         <StyledLink to="/" onClick={() => setOpen(false)}>
           Produtos
@@ -36,10 +34,10 @@ export function Header({ cartCount }: HeaderProps) {
   );
 }
 
-/* ======== STYLED COMPONENTS ======== */
+
 
 const HeaderContainer = styled.header`
-  display: flex;
+  display:flex;
   justify-content: space-between;
   align-items: center;
   background: linear-gradient(90deg, #007bff, #0062cc);
