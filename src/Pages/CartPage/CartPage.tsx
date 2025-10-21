@@ -1,45 +1,66 @@
 import styled from "styled-components";
 import { getCart, removeFromCart } from "../../cart";
+import type { CartItem } from "../../cart";
 import { useState, useEffect } from "react";
-import { Product } from "../../types";
 import { Header } from "../../components/Header/Header";
+import { subscribeToCartUpdates, notifyCartUpdated } from "../../cartEvents";
 
 export function CartPage() {
-  const [cart, setCart] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [message, setMessage] = useState<string>("");
+  const [itemCount, setItemCount] = useState<number>(0);
+
+  // Função para calcular o total de itens no carrinho
+  const calculateItemCount = (cartItems: CartItem[]): number => {
+    return cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  };
 
   useEffect(() => {
     const storedCart = getCart();
     setCart(storedCart);
+    setItemCount(calculateItemCount(storedCart));
+
+    const unsubscribe = subscribeToCartUpdates(() => {
+      const updatedCart = getCart();
+      setCart(updatedCart);
+      setItemCount(calculateItemCount(updatedCart));
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    const sum = cart.reduce((acc, item) => acc + item.price, 0);
-    setTotal(Number(sum.toFixed(2)));
-  }, [cart]); 
+    const newTotal = cart.reduce(
+      (sum, item) => sum + item.product.price * item.quantity,
+      0
+    );
+    setTotal(Number(newTotal.toFixed(2)));
+    setItemCount(calculateItemCount(cart));
+  }, [cart]);
 
-  function handleRemove(id: number) {
-    const updated = removeFromCart(id);
-    setCart(updated);
+  function handleRemove(productId: number) {
+    removeFromCart(productId);
   }
 
   function handleCheckout() {
-    if (cart.length === 0) {
+    if (itemCount === 0) {
       setMessage("Seu carrinho está vazio 😢");
       return;
     }
 
     setMessage("✅ Compra finalizada com sucesso!");
-    setCart([]);
     localStorage.removeItem("cart");
+    notifyCartUpdated();
+    setCart([]);
+    setItemCount(0);
 
     setTimeout(() => setMessage(""), 3000);
   }
 
   return (
     <>
-      <Header cartCount={cart.length} />
+      <Header cartCount={itemCount} />
       <Container>
         <h2>🛒 Seu Carrinho</h2>
 
@@ -48,23 +69,32 @@ export function CartPage() {
         ) : (
           <>
             <CartList>
-              {cart.map((p) => (
-                <CartItem key={p.id}>
-                  <img src={p.image} alt={p.title} />
+              {cart.map((item) => (
+                <CartItem key={item.product.id}>
+                  <img src={item.product.image} alt={item.product.title} />
                   <Info>
-                    <h4>{p.title}</h4>
-                    <p>💰 R$ {p.price.toFixed(2)}</p>
+                    <h4>{item.product.title}</h4>
+                    <Price>💰 R$ {item.product.price.toFixed(2)}</Price>
+                    <Quantity>Quantidade: {item.quantity}</Quantity>
+                    <Subtotal>
+                      Subtotal:{" "}
+                      <PriceHighlight>
+                        R$ {(item.product.price * item.quantity).toFixed(2)}
+                      </PriceHighlight>
+                    </Subtotal>
                   </Info>
-                  <RemoveButton onClick={() => handleRemove(p.id)}>
-                    Remover
-                  </RemoveButton>
+                  <ButtonGroup>
+                    <RemoveButton onClick={() => handleRemove(item.product.id)}>
+                      Remover 1
+                    </RemoveButton>
+                  </ButtonGroup>
                 </CartItem>
               ))}
             </CartList>
 
             <Summary>
               <h3>
-                Total: <span>R$ {total.toFixed(2)}</span>
+                Total: <TotalPrice>R$ {total.toFixed(2)}</TotalPrice>
               </h3>
               <CheckoutButton onClick={handleCheckout}>
                 Finalizar Compra
@@ -81,13 +111,28 @@ export function CartPage() {
 const Container = styled.div`
   padding: 40px;
   text-align: center;
+  max-width: 1200px;
+  margin: 0 auto;
 
   h2 {
     margin-bottom: 30px;
+    font-size: 2rem;
+  }
+
+  @media (max-width: 1024px) {
+    padding: 30px;
+    
+    h2 {
+      font-size: 1.8rem;
+    }
   }
 
   @media (max-width: 768px) {
     padding: 20px;
+    
+    h2 {
+      font-size: 1.5rem;
+    }
   }
 `;
 
@@ -95,7 +140,9 @@ const CartList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 20px;
-  margin-top: 30px;
+  margin: 30px auto;
+  max-width: 900px;
+  width: 100%;
 `;
 
 const CartItem = styled.div`
@@ -105,7 +152,7 @@ const CartItem = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 25px;
+  padding: 20px 25px;
   transition: transform 0.2s ease;
 
   &:hover {
@@ -113,27 +160,48 @@ const CartItem = styled.div`
   }
 
   img {
-    width: 70px;
-    height: 70px;
+    width: 100px;
+    height: 100px;
     object-fit: contain;
+  }
+
+  @media (max-width: 1024px) {
+    img {
+      width: 85px;
+      height: 85px;
+    }
   }
 
   @media (max-width: 768px) {
     flex-direction: column;
     text-align: center;
-    gap: 10px;
+    gap: 15px;
+    padding: 20px 15px;
+
+    img {
+      width: 120px;
+      height: 120px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    img {
+      width: 100px;
+      height: 100px;
+    }
   }
 `;
 
 const Info = styled.div`
   flex: 1;
   text-align: left;
-  margin-left: 20px;
+  margin-left: 25px;
 
   h4 {
-    font-size: 1rem;
-    margin-bottom: 5px;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
     font-weight: 500;
+    line-height: 1.4;
   }
 
   p {
@@ -141,9 +209,27 @@ const Info = styled.div`
     font-weight: bold;
   }
 
+  @media (max-width: 1024px) {
+    h4 {
+      font-size: 1rem;
+    }
+  }
+
   @media (max-width: 768px) {
     text-align: center;
     margin: 0;
+    width: 100%;
+    padding: 0 15px;
+
+    h4 {
+      font-size: 1.1rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    h4 {
+      font-size: 1rem;
+    }
   }
 `;
 
@@ -162,27 +248,75 @@ const RemoveButton = styled.button`
 `;
 
 const Summary = styled.div`
-  margin-top: 40px;
-  padding: 25px;
+  margin: 40px auto;
+  padding: 30px;
   background: #f9f9f9;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  display: inline-block;
   text-align: center;
   width: 100%;
   max-width: 400px;
 
   h3 {
-    font-size: 1.4rem;
-    margin-bottom: 20px;
+    font-size: 1.6rem;
+    margin-bottom: 25px;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
 
-    span {
-      color: #007bff;
+  @media (max-width: 1024px) {
+    max-width: 380px;
+    padding: 25px;
+
+    h3 {
+      font-size: 1.5rem;
     }
   }
 
   @media (max-width: 768px) {
-    width: 90%;
+    max-width: 100%;
+    margin: 30px auto;
+
+    h3 {
+      font-size: 1.4rem;
+      gap: 10px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    padding: 20px;
+    margin: 20px auto;
+
+    h3 {
+      font-size: 1.3rem;
+    }
+  }
+`;
+
+const TotalPrice = styled.span`
+  color: #2ecc71;
+  font-weight: bold;
+  font-size: 1.6rem;
+  display: inline-block;
+  transition: transform 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+
+  @media (max-width: 1024px) {
+    font-size: 1.5rem;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 1.4rem;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 1.3rem;
   }
 `;
 
@@ -190,27 +324,131 @@ const CheckoutButton = styled.button`
   background: #007bff;
   color: white;
   border: none;
-  padding: 10px 20px;
-  font-size: 1rem;
+  padding: 12px 25px;
+  font-size: 1.1rem;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  transition: background 0.3s;
+  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 250px;
 
   &:hover {
     background: #0056b3;
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 1024px) {
+    padding: 10px 20px;
+    font-size: 1rem;
+    max-width: 220px;
+  }
+
+  @media (max-width: 768px) {
+    max-width: 200px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 10px 15px;
+    font-size: 0.95rem;
+    max-width: 180px;
   }
 `;
 
 const Message = styled.p`
-  margin-top: 15px;
-  font-size: 1rem;
-  color: green;
-  font-weight: bold;
+  margin-top: 20px;
+  font-size: 1.1rem;
+  color: #28a745;
+  font-weight: 600;
+  animation: fadeIn 0.3s ease-in;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 1024px) {
+    font-size: 1rem;
+    margin-top: 18px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 0.95rem;
+    margin-top: 15px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 0.9rem;
+    margin-top: 12px;
+  }
 `;
 
 const Empty = styled.p`
-  font-size: 1.2rem;
-  color: #777;
-  margin-top: 40px;
+  font-size: 1.3rem;
+  color: #666;
+  margin-top: 50px;
+  padding: 30px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  display: inline-block;
+
+  @media (max-width: 1024px) {
+    font-size: 1.2rem;
+    margin-top: 40px;
+    padding: 25px;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 1.1rem;
+    margin-top: 30px;
+    padding: 20px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 1rem;
+    margin-top: 25px;
+    padding: 15px;
+    width: 90%;
+  }
+`;
+
+const Quantity = styled.p`
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 5px;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: center;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+`;
+
+const Price = styled.p`
+  color: #2c3e50;
+  font-weight: 600;
+  font-size: 1rem;
+  margin: 5px 0;
+`;
+
+const PriceHighlight = styled.span`
+  color: #2ecc71;
+  font-weight: bold;
+`;
+
+const Subtotal = styled.p`
+  color: #34495e;
+  font-weight: bold;
+  font-size: 0.9rem;
+  margin-top: 5px;
 `;
