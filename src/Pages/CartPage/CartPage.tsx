@@ -1,9 +1,9 @@
 import styled from "styled-components";
-import { getCart, removeFromCart } from "../../cart";
+import { getCart, removeFromCart, getCartTotal } from "../../cart";
 import type { CartItem } from "../../cart";
 import { useState, useEffect } from "react";
 import { Header } from "../../components/Header/Header";
-import { subscribeToCartUpdates, notifyCartUpdated } from "../../cartEvents";
+import { subscribeToCartUpdates } from "../../cartEvents";
 
 export function CartPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -17,30 +17,39 @@ export function CartPage() {
   };
 
   useEffect(() => {
-    const storedCart = getCart();
-    setCart(storedCart);
-    setItemCount(calculateItemCount(storedCart));
+    const loadCart = () => {
+      const storedCart = getCart();
+      setCart(storedCart);
+      setItemCount(calculateItemCount(storedCart));
+      const newTotal = storedCart.reduce(
+        (sum, item) => sum + item.product.price * item.quantity,
+        0
+      );
+      setTotal(Number(newTotal.toFixed(2)));
+    };
 
-    const unsubscribe = subscribeToCartUpdates(() => {
-      const updatedCart = getCart();
-      setCart(updatedCart);
-      setItemCount(calculateItemCount(updatedCart));
-    });
+    loadCart();
+    const unsubscribe = subscribeToCartUpdates(loadCart);
 
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    const newTotal = cart.reduce(
+    if (cart.length > 0) {
+      setTotal(getCartTotal(cart));
+      setItemCount(calculateItemCount(cart));
+    }
+  }, [cart]);
+
+  function handleRemove(productId: number) {
+    const updatedCart = removeFromCart(productId);
+    setCart(updatedCart);
+    const newTotal = updatedCart.reduce(
       (sum, item) => sum + item.product.price * item.quantity,
       0
     );
     setTotal(Number(newTotal.toFixed(2)));
-    setItemCount(calculateItemCount(cart));
-  }, [cart]);
-
-  function handleRemove(productId: number) {
-    removeFromCart(productId);
+    setItemCount(calculateItemCount(updatedCart));
   }
 
   function handleCheckout() {
@@ -51,9 +60,9 @@ export function CartPage() {
 
     setMessage("✅ Compra finalizada com sucesso!");
     localStorage.removeItem("cart");
-    notifyCartUpdated();
     setCart([]);
     setItemCount(0);
+    setTotal(0);
 
     setTimeout(() => setMessage(""), 3000);
   }
@@ -111,28 +120,13 @@ export function CartPage() {
 const Container = styled.div`
   padding: 40px;
   text-align: center;
-  max-width: 1200px;
-  margin: 0 auto;
 
   h2 {
     margin-bottom: 30px;
-    font-size: 2rem;
-  }
-
-  @media (max-width: 1024px) {
-    padding: 30px;
-    
-    h2 {
-      font-size: 1.8rem;
-    }
   }
 
   @media (max-width: 768px) {
     padding: 20px;
-    
-    h2 {
-      font-size: 1.5rem;
-    }
   }
 `;
 
@@ -140,9 +134,7 @@ const CartList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 20px;
-  margin: 30px auto;
-  max-width: 900px;
-  width: 100%;
+  margin-top: 30px;
 `;
 
 const CartItem = styled.div`
@@ -152,7 +144,7 @@ const CartItem = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 25px;
+  padding: 15px 25px;
   transition: transform 0.2s ease;
 
   &:hover {
@@ -160,48 +152,27 @@ const CartItem = styled.div`
   }
 
   img {
-    width: 100px;
-    height: 100px;
+    width: 70px;
+    height: 70px;
     object-fit: contain;
-  }
-
-  @media (max-width: 1024px) {
-    img {
-      width: 85px;
-      height: 85px;
-    }
   }
 
   @media (max-width: 768px) {
     flex-direction: column;
     text-align: center;
-    gap: 15px;
-    padding: 20px 15px;
-
-    img {
-      width: 120px;
-      height: 120px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    img {
-      width: 100px;
-      height: 100px;
-    }
+    gap: 10px;
   }
 `;
 
 const Info = styled.div`
   flex: 1;
   text-align: left;
-  margin-left: 25px;
+  margin-left: 20px;
 
   h4 {
-    font-size: 1.1rem;
-    margin-bottom: 8px;
+    font-size: 1rem;
+    margin-bottom: 5px;
     font-weight: 500;
-    line-height: 1.4;
   }
 
   p {
@@ -209,27 +180,9 @@ const Info = styled.div`
     font-weight: bold;
   }
 
-  @media (max-width: 1024px) {
-    h4 {
-      font-size: 1rem;
-    }
-  }
-
   @media (max-width: 768px) {
     text-align: center;
     margin: 0;
-    width: 100%;
-    padding: 0 15px;
-
-    h4 {
-      font-size: 1.1rem;
-    }
-  }
-
-  @media (max-width: 480px) {
-    h4 {
-      font-size: 1rem;
-    }
   }
 `;
 
@@ -248,174 +201,64 @@ const RemoveButton = styled.button`
 `;
 
 const Summary = styled.div`
-  margin: 40px auto;
-  padding: 30px;
+  margin-top: 80px;
+  padding: 25px;
   background: #f9f9f9;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  display: inline-block;
   text-align: center;
-  width: 100%;
+  width: 80%;
   max-width: 400px;
 
   h3 {
-    font-size: 1.6rem;
-    margin-bottom: 25px;
+    font-size: 1.4rem;
+    margin-bottom: 20px;
     color: #2c3e50;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-  }
-
-  @media (max-width: 1024px) {
-    max-width: 380px;
-    padding: 25px;
-
-    h3 {
-      font-size: 1.5rem;
-    }
+    gap: 8px;
   }
 
   @media (max-width: 768px) {
-    max-width: 100%;
-    margin: 30px auto;
-
-    h3 {
-      font-size: 1.4rem;
-      gap: 10px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    padding: 20px;
-    margin: 20px auto;
-
-    h3 {
-      font-size: 1.3rem;
-    }
+    width: 90%;
   }
 `;
 
 const TotalPrice = styled.span`
   color: #2ecc71;
   font-weight: bold;
-  font-size: 1.6rem;
-  display: inline-block;
-  transition: transform 0.2s ease;
-
-  &:hover {
-    transform: scale(1.05);
-  }
-
-  @media (max-width: 1024px) {
-    font-size: 1.5rem;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 1.4rem;
-  }
-
-  @media (max-width: 480px) {
-    font-size: 1.3rem;
-  }
+  font-size: 1.5rem;
 `;
 
 const CheckoutButton = styled.button`
   background: #007bff;
   color: white;
   border: none;
-  padding: 12px 25px;
-  font-size: 1.1rem;
+  padding: 10px 20px;
+  font-size: 1rem;
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  transition: all 0.3s ease;
-  width: 100%;
-  max-width: 250px;
+  transition: background 0.3s;
 
   &:hover {
     background: #0056b3;
-    transform: translateY(-2px);
-  }
-
-  @media (max-width: 1024px) {
-    padding: 10px 20px;
-    font-size: 1rem;
-    max-width: 220px;
-  }
-
-  @media (max-width: 768px) {
-    max-width: 200px;
-  }
-
-  @media (max-width: 480px) {
-    padding: 10px 15px;
-    font-size: 0.95rem;
-    max-width: 180px;
   }
 `;
 
 const Message = styled.p`
-  margin-top: 20px;
-  font-size: 1.1rem;
-  color: #28a745;
-  font-weight: 600;
-  animation: fadeIn 0.3s ease-in;
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @media (max-width: 1024px) {
-    font-size: 1rem;
-    margin-top: 18px;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 0.95rem;
-    margin-top: 15px;
-  }
-
-  @media (max-width: 480px) {
-    font-size: 0.9rem;
-    margin-top: 12px;
-  }
+  margin-top: 15px;
+  font-size: 1rem;
+  color: green;
+  font-weight: bold;
 `;
 
 const Empty = styled.p`
-  font-size: 1.3rem;
-  color: #666;
-  margin-top: 50px;
-  padding: 30px;
-  background: #f9f9f9;
-  border-radius: 12px;
-  display: inline-block;
-
-  @media (max-width: 1024px) {
-    font-size: 1.2rem;
-    margin-top: 40px;
-    padding: 25px;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 1.1rem;
-    margin-top: 30px;
-    padding: 20px;
-  }
-
-  @media (max-width: 480px) {
-    font-size: 1rem;
-    margin-top: 25px;
-    padding: 15px;
-    width: 90%;
-  }
+  font-size: 1.2rem;
+  color: #777;
+  margin-top: 40px;
 `;
 
 const Quantity = styled.p`

@@ -48,7 +48,7 @@ const HeaderContainer = styled.header`
   top: 0;
   z-index: 50;
   transition: all 0.3s ease;
-  width: 95%;
+  width: 1448px;
 
   @media (max-width: 768px) {
     padding: 15px 25px;

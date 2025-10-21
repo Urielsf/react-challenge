@@ -1,23 +1,30 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { Product } from "../../types";
-import { addToCart, getCart, } from "../../cart";
+import { addToCart, getCartItemCount } from "../../cart";
 import { ProductCard } from "../../components/Header/ProductCard";
 import { Header } from "../../components/Header/Header";
+import { subscribeToCartUpdates } from "../../cartEvents";
 
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [cartCount, setCartCount] = useState(getCart().length);
+  const [cartCount, setCartCount] = useState(getCartItemCount());
 
   useEffect(() => {
     fetch("https://fakestoreapi.com/products")
       .then((res) => res.json())
       .then((data) => setProducts(data));
+
+    const unsubscribe = subscribeToCartUpdates(() => {
+      setCartCount(getCartItemCount());
+    });
+
+    return () => unsubscribe();
   }, []);
 
   function handleAddToCart(product: Product) {
-    const newCart = addToCart(product);
-    setCartCount(newCart.length);
+    addToCart(product);
+    setCartCount(getCartItemCount());
   }
 
   return (
@@ -46,6 +53,9 @@ const Container = styled.div`
 
 const ProductsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 25px;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 50px;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 20px;
 `;

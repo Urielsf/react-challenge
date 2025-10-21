@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ProductsPage } from "./Pages/CartPage/ProductsPage";
+import { ProductsPage } from "./Pages/ProductsPage/ProductsPage";
 import { CartPage } from "./Pages/CartPage/CartPage";
 
 export default function App() {
