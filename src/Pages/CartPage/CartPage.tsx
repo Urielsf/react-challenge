@@ -94,7 +94,7 @@ export function CartPage() {
                   </Info>
                   <ButtonGroup>
                     <RemoveButton onClick={() => handleRemove(item.product.id)}>
-                      Remover 1
+                      Remover
                     </RemoveButton>
                   </ButtonGroup>
                 </CartItem>
